@@ -2,6 +2,7 @@ import sys
 import timeit
 
 from PyQt5 import QtWidgets as qtw
+from PyQt5 import QtCore as qtc
 
 
 def reverse_string_slice(inputted: str):
@@ -70,7 +71,18 @@ def reverse(string):
 
 def time_function(function_name, text):
     times = timeit.timeit(lambda: function_name(text), number=10000)
-    return "{:2f}".format(times) + "s"
+    return "{:2f}".format(times)
+
+
+def compare_time(time1, time2):
+    time1_float = float(time1)
+    time2_float = float(time2)
+    if time1_float > time2_float:
+        return str(time1_float / time2_float)
+    elif time1_float < time2_float:
+        return "{:.2f}".format(time2_float / time1_float)
+    else:
+        return "Equal"
 
 
 class MainApp(qtw.QApplication):
@@ -101,6 +113,10 @@ class MainWindow(qtw.QWidget):
         self.reversed_recursion = qtw.QLabel("Reversed using recursion: ")
         self.reversed_stack = qtw.QLabel("Reversed using stack: ")
         self.reversed_reversed = qtw.QLabel("Reversed using reverse(): ")
+        self.loop_comparison = qtw.QLabel()
+        self.recursion_comparison = qtw.QLabel()
+        self.stack_comparison = qtw.QLabel()
+        self.reverse_comparison = qtw.QLabel()
 
         self.slice_time = qtw.QLabel(self.slice_time_text)
         self.loop_time = qtw.QLabel(self.loop_time_text)
@@ -112,6 +128,7 @@ class MainWindow(qtw.QWidget):
         self.setMinimumSize(250, 50)
 
         self.input = qtw.QLineEdit()
+        self.time_layout = qtw.QGridLayout()
         self.setLayout(qtw.QVBoxLayout())
         self.layout().addWidget(self.info_label)
         self.layout().addWidget(self.input)
@@ -121,11 +138,13 @@ class MainWindow(qtw.QWidget):
         self.layout().addWidget(self.reversed_recursion)
         self.layout().addWidget(self.reversed_stack)
         self.layout().addWidget(self.reversed_reversed)
-        self.layout().addWidget(self.slice_time)
-        self.layout().addWidget(self.loop_time)
-        self.layout().addWidget(self.recursion_time)
-        self.layout().addWidget(self.stack_time)
-        self.layout().addWidget(self.reversed_time)
+
+        self.layout().addLayout(self.time_layout)
+        self.time_layout.addWidget(self.slice_time)
+        self.time_layout.addWidget(self.loop_time)
+        self.time_layout.addWidget(self.recursion_time)
+        self.time_layout.addWidget(self.stack_time)
+        self.time_layout.addWidget(self.reversed_time)
 
         self.input.textChanged.connect(self.inputted_logic)
         self.input.editingFinished.connect(self.edited)
@@ -141,12 +160,34 @@ class MainWindow(qtw.QWidget):
         self.adjustSize()
 
     def edited(self):
-        self.slice_time.setText(self.slice_time_text + time_function(reverse_string_slice, self.inputted_string))
-        self.loop_time.setText(self.loop_time_text + time_function(reverse_string_loop, self.inputted_string))
-        self.recursion_time.setText(self.recursion_time_text + time_function(reverse_string_recursion,
-                                                                             self.inputted_string))
-        self.stack_time.setText(self.stack_time_text + time_function(reverse_string_stack, self.inputted_string))
-        self.reversed_time.setText(self.reversed_time_text + time_function(reverse, self.inputted_string))
+        slice_time_taken = time_function(reverse_string_slice, self.inputted_string)
+        loop_time_taken = time_function(reverse_string_loop, self.inputted_string)
+        recursion_time_taken = time_function(reverse_string_recursion, self.inputted_string)
+        stack_time_taken = time_function(reverse_string_stack, self.inputted_string)
+        reverse_time_taken = time_function(reverse, self.inputted_string)
+
+        self.slice_time.setText(self.slice_time_text + slice_time_taken + "s")
+        self.loop_time.setText(self.loop_time_text + loop_time_taken + "s")
+        self.recursion_time.setText(self.recursion_time_text + recursion_time_taken + "s")
+        self.stack_time.setText(self.stack_time_text + stack_time_taken + "s")
+        self.reversed_time.setText(self.reversed_time_text + reverse_time_taken + "s")
+        self.time_layout.addWidget(self.loop_comparison, 1, 1)
+        self.time_layout.addWidget(self.recursion_comparison, 2, 1)
+        self.time_layout.addWidget(self.stack_comparison, 3, 1)
+        self.time_layout.addWidget(self.reverse_comparison, 4, 1)
+
+        self.resize(self.sizeHint())
+        qtc.QTimer.singleShot(0, lambda: self.adjustSize())
+
+        self.loop_comparison.setText("Looping takes " + compare_time(slice_time_taken, loop_time_taken)
+                                     + " times longer than slicing")
+        self.recursion_comparison.setText("Recursion takes " + compare_time(slice_time_taken, recursion_time_taken)
+                                          + " times longer than slicing")
+        self.stack_comparison.setText("Stacking takes " + compare_time(slice_time_taken, stack_time_taken)
+                                      + " times longer than slicing")
+        self.reverse_comparison.setText("Reverse() takes " + compare_time(slice_time_taken, reverse_time_taken)
+                                        + " times longer than slicing")
+
 
 
 if __name__ == '__main__':
