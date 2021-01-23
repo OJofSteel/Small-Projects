@@ -189,7 +189,6 @@ class MainWindow(qtw.QWidget):
                                         + " times longer than slicing")
 
 
-
 if __name__ == '__main__':
     app = MainApp(sys.argv)
     sys.exit(app.exec_())
