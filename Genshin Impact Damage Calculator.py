@@ -27,14 +27,14 @@ class MainWindow(qtw.QWidget):
         self.setWindowTitle("Genshin Impact Damage Calculator")
         self.setMinimumSize(260, 260)
 
-        self.atk_input = qtw.QLineEdit(placeholderText="Enter Total ATK")
-        self.dmg_input = qtw.QLineEdit(placeholderText="Enter Total DMG%")
-        self.ability_input = qtw.QLineEdit(placeholderText="Enter Total Ability%")
-        self.crit_rate_input = qtw.QLineEdit(placeholderText="Enter Total Crit Rate%")
-        self.crit_dmg_input = qtw.QLineEdit(placeholderText="Enter Total Crit DMG%")
-        self.player_level_input = qtw.QLineEdit(placeholderText="Enter Player Level")
-        self.enemy_level_input = qtw.QLineEdit(placeholderText="Enter Enemy Level")
-        self.enemy_resistance_input = qtw.QLineEdit(placeholderText="Enter Enemy Resistance")
+        self.atk_input = qtw.QSpinBox(maximum=99999)
+        self.dmg_input = qtw.QDoubleSpinBox(maximum=99999, suffix="%")
+        self.ability_input = qtw.QDoubleSpinBox(maximum=99999, suffix="%")
+        self.crit_rate_input = qtw.QDoubleSpinBox(maximum=100, suffix="%")
+        self.crit_dmg_input = qtw.QDoubleSpinBox(maximum=99999, suffix="%")
+        self.player_level_input = qtw.QSpinBox(maximum=1000)
+        self.enemy_level_input = qtw.QSpinBox(maximum=1000)
+        self.enemy_resistance_input = qtw.QDoubleSpinBox(maximum=100, suffix="%")
 
         self.submit_button = qtw.QPushButton("Submit")
 
@@ -94,35 +94,51 @@ class MainWindow(qtw.QWidget):
 
     def submit_verification(self):
         if (self.convert_to_int(self.atk_input.text(), 0) and
-                self.convert_to_float(self.dmg_input.text(), 2) and
-                self.convert_to_float(self.ability_input.text(), 4) and
-                self.convert_to_float(self.crit_rate_input.text(), 6) and
-                self.convert_to_float(self.crit_dmg_input.text(), 8) and
-                self.convert_to_int(self.player_level_input.text(), 10) and
-                self.convert_to_int(self.enemy_level_input.text(), 12) and
-                self.convert_to_float(self.enemy_resistance_input.text(), 14)):
-            self.submitted.emit(int(self.atk_input.text()), float(self.dmg_input.text()),
-                                float(self.ability_input.text()), float(self.crit_rate_input.text()),
-                                float(self.crit_dmg_input.text()), int(self.player_level_input.text()),
-                                int(self.enemy_level_input.text()), float(self.enemy_resistance_input.text()))
+                self.convert_to_float(self.dmg_input.cleanText(), 2) and
+                self.convert_to_float(self.ability_input.cleanText(), 4) and
+                self.convert_to_float(self.crit_rate_input.cleanText(), 6) and
+                self.convert_to_float(self.crit_dmg_input.cleanText(), 8) and
+                self.convert_to_int(self.player_level_input.cleanText(), 10) and
+                self.convert_to_int(self.enemy_level_input.cleanText(), 12) and
+                self.convert_to_float(self.enemy_resistance_input.cleanText(), 14)):
+            self.submitted.emit(int(self.atk_input.cleanText()), float(self.dmg_input.cleanText()),
+                                float(self.ability_input.cleanText()), float(self.crit_rate_input.cleanText()),
+                                float(self.crit_dmg_input.cleanText()), int(self.player_level_input.cleanText()),
+                                int(self.enemy_level_input.cleanText()), float(self.enemy_resistance_input.cleanText()))
 
 
 def crit_bonus(crit_rate: float, crit_dmg: float):
-    return 1 + (crit_rate * crit_dmg)
+    return 1 + ((crit_rate / 100) * (crit_dmg / 100))
 
 
 def defense(player_level: int, enemy_level: int, defense_drop: float = 1):
-    return (100+player_level)/((100+player_level) + (100 + enemy_level) * defense_drop)
+    return (100 + player_level) / ((100 + player_level) + (100 + enemy_level) * defense_drop)
+
+
+def eff_atk(atk, dmg):
+    return atk * (1 + (dmg / 100))
+
+
+def damage_on_crit(eff_attack, crit_dmg, ability, resistance, total_defense):
+    return eff_attack * (ability/100) * (1 + (crit_dmg/100)) * total_defense * (1-(resistance/100))
+
+
+def damage_on_non_crit(eff_attack, ability, resistance, total_defense):
+    return eff_attack * (ability/100) * total_defense * (1-(resistance/100))
+
+
+def average_damage(eff_attack, total_crit_bonus, ability, resistance, total_defense):
+    return eff_attack * (ability/100) * total_crit_bonus * total_defense * (1-(resistance/100))
 
 
 class ResultWindow(qtw.QWidget):
-
+    defense: float
     crit_bonus: float
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Results")
-        self.setMinimumSize(260, 210)
+        self.setMinimumSize(300, 210)
         self.setWindowModality(qtc.Qt.ApplicationModal)
 
         self.atk_label = qtw.QLabel()
@@ -197,17 +213,29 @@ class ResultWindow(qtw.QWidget):
 
     @qtc.pyqtSlot(int, float, float, float, float, int, int, float)
     def initial_logic(self, atk, dmg, ability, crit_rate, crit_dmg, player_level, enemy_level, enemy_resistance):
+        self.crit_bonus = crit_bonus(crit_rate, crit_dmg)
+        self.defense = defense(player_level, enemy_level)
+        self.eff_atk = eff_atk(atk, dmg)
+        self.average_damage = average_damage(self.eff_atk, self.crit_bonus, ability, enemy_resistance, self.defense)
+        self.on_crit_damage = damage_on_crit(self.eff_atk, crit_dmg, ability, enemy_resistance, self.defense)
+        self.on_non_crit_damage = damage_on_non_crit(self.eff_atk, ability, enemy_resistance, self.defense)
+
         self.show()
         self.atk_label.setText(str(atk))
-        self.dmg_label.setText(str(dmg))
-        self.ability_label.setText(str(ability))
-        self.crit_rate_label.setText(str(crit_rate))
-        self.crit_dmg_label.setText(str(crit_dmg))
+        self.dmg_label.setText("{:.2%}".format(dmg / 100))
+        self.ability_label.setText("{:.2%}".format(ability / 100))
+        self.crit_rate_label.setText("{:.2%}".format(crit_rate / 100))
+        self.crit_dmg_label.setText("{:.2%}".format(crit_dmg / 100))
         self.player_level_label.setText(str(player_level))
         self.enemy_level_label.setText(str(enemy_level))
-        self.enemy_resistance_label.setText(str(enemy_resistance))
-        self.crit_bonus = crit_bonus(float(self.crit_rate_label.text()), float(self.crit_dmg_label.text()))
+        self.enemy_resistance_label.setText("{:.2%}".format(enemy_resistance / 100))
+
         self.crit_bonus_label.setText("{:.2%}".format(self.crit_bonus))
+        self.defense_label.setText("{:.2%}".format(self.defense))
+        self.eff_atk_label.setText("{:.2f}".format(self.eff_atk))
+        self.average_damage_label.setText("{:.2f}".format(self.average_damage))
+        self.crit_damage_label.setText("{:.2f}".format(self.on_crit_damage))
+        self.non_crit_damage_label.setText("{:.2f}".format(self.on_non_crit_damage))
 
 
 if __name__ == '__main__':
